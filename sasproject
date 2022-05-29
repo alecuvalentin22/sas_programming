@@ -1,0 +1,319 @@
+/*1) Importing a non-SAS file and creating SAS data tables*/ 
+data online_store;
+infile '/home/u48767212/ProjectSAS/Online_store.csv' missover dlm="," firstobs=2;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity;
+title "Creating the data set for online store";
+run;
+PROC PRINT data=online_store;
+RUN;
+
+/*2) User format by ProductCategory with the following conditions */
+PROC format;
+value $ProductCategory 'Large Appliances' = 'Electrocasnice'
+		'TV Video' = 'Electrocasnice'
+		other = 'Divertisment';
+	run;
+PROC print data=online_store;
+var CrtNo ProductName ProductCategory ProductPrice;
+format ProductCategory $ProductCategory.;
+title "Format for prodCateg";
+       run;
+
+/*3) Subset only with the Mobile products with a price smaller than 999*/
+data cheap_mobile_products;
+set work.online_store;
+select;
+when (ProductPrice< 999 AND ProductCategory = "Mobile") output;
+otherwise;
+end;
+proc print data = cheap_mobile_products;
+run;
+
+/* iterative and conditional processing of data + creating data subsets*/
+data low_quantity_products_by_price;
+infile '/home/u48767212/ProjectSAS/prices.txt';
+length ProductName $12;
+length PriceRange $12;
+INPUT ProductName$ ProductPrice Quantity;
+if Quantity gt 100 then delete;
+if ProductPrice le 1000 then PriceRange='Inexpensive';
+else if ProductPrice gt 1001 and ProductPrice le 2000 then PriceRange='Affordable';
+else if ProductPrice gt 2000 then PriceRange='Expensive';
+run;
+title 'The Products with a quantity less than 100 by price range';
+proc print data=low_quantity_products_by_price noobs;
+run;
+
+/* iterative and cond processing for the increase of i9 in next 7 years*/
+data increase_of_i9;
+infile '/home/u48767212/ProjectSAS/prices.txt';
+length ProductName $12;
+INPUT ProductName$ ProductPrice;
+expectedIncrease = .10;
+do Year=1 to 7;
+	ProductPrice = ProductPrice+ProductPrice*expectedIncrease;
+	output;
+end;
+format ProductPrice dollar10.2;
+run;
+title 'Increase in price of i9 processor';
+proc print data = increase_of_i9(keep = ProductName ProductPrice Year) noobs;
+where ProductName eq 'i9';
+run;
+
+/*SAS FUNCTIONS */ 
+DATA Produse_updated;
+infile '/home/u48767212/ProjectSAS/Online_store_updated.csv' missover dlm="," firstobs=2;
+input  CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ ProductPrice 
+DiscountPercentage DiscountEndDate :ddmmyy10. Quantity TotalPrice;
+TotalPrice = int(TotalPrice);
+RUN;
+PROC PRINT data = Produse_updated;
+RUN;
+
+PROC MEANS DATA=Produse_updated(drop= CrtNo DiscountPercentage DiscountEndDate) MEAN MEDIAN MAX MIN;
+	TITLE "Total prices report based on the functions mean median max min";
+RUN;
+
+/* SAS Function calculate the price of products applying the discounts for them */
+
+data discounted_products;
+infile '/home/u48767212/ProjectSAS/Online_store.csv' missover dlm="," firstobs=2;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity;
+PriceAfterDiscount= (ProductPrice*((100-DiscountPercentage)/100));
+format ProductPrice dollar10.2;
+format PriceAfterDiscount dollar10.2;
+run;
+title 'Discounted products';
+proc print data=discounted_products(keep=ProductName ProductPrice PriceAfterDiscount) noobs;
+run;
+
+/* SAS interclasare ascending order by product category */
+
+DATA gaming;
+infile '/home/u48767212/ProjectSAS/Online_store.csv' missover dlm="," firstobs=2;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity;
+if ProductCategory ne 'Gaming' then delete;
+PROC SORT DATA = gaming;
+   BY ProductCategory;
+RUN;
+
+DATA mobile;
+infile '/home/u48767212/ProjectSAS/Online_store.csv' missover dlm="," firstobs=2;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity;
+if ProductCategory ne 'Mobile' then delete;
+PROC SORT DATA = mobile;
+   BY ProductCategory;
+RUN;
+
+DATA products_inter;
+   SET gaming mobile;
+   BY ProductCategory;
+RUN;
+PROC PRINT DATA = products_inter;
+   TITLE 'Interclassing by prod categ for mobile gaming';
+RUN;
+
+/* combining set of data using SQL */
+Data manufactProd;
+Input ProductCode$ ManufacturingPrice;
+cards;
+LUB3AE88S 1425
+RFNE448E41XB 2625
+LUT6NF18S 2925
+W55ZM 825
+UI61S1 1625
+RFNE312K31WN 1675
+ABB682F1AF 2125
+LFB2AF88S 1405
+RT38K5530S9 1725
+
+;
+run;	
+Data finalProd;
+Input ProductCode$ ProductPrice;
+cards;
+LUB3AE88S 1500
+RFNE448E41XB 2700
+LUT6NF18S 3000
+W55ZM 900
+UI61S1 1700
+RFNE312K31WN 1750
+ABB682F1AF 2200
+LFB2AF88S 1480
+RT38K5530S9 1800
+RSSE44232S 2000
+KSV33NWEP 2500
+GWH12AAB 1790
+YW12G8 2100
+FTXC35C 2000
+G991BZVDEUE 3000
+;
+run;
+*INNER JOIN;
+PROC SQL;
+Create table inner_join as
+Select * from manufactProd as b, finalProd as e
+where b.ProductCode = e.ProductCode;
+QUIT;
+*LEFT JOIN;
+PROC SQL;
+Create table left_join as
+Select * from manufactProd as b left join finalProd as e
+On b.ProductCode = e.ProductCode;
+QUIT; 
+*RIGHT JOIN;
+PROC SQL;
+Create table right_join as
+Select * from manufactProd as b right join finalProd as e
+On b.ProductCode = e.ProductCode;
+QUIT; 
+*FULL JOIN;
+PROC SQL;
+Create table full_join as
+Select * from manufactProd as b full join finalProd as e
+On b.ProductCode = e.ProductCode;
+QUIT;
+
+/* USING arrays */
+
+DATA nonDiscountedProducts;
+infile '/home/u48767212/ProjectSAS/Online_store_more_prices.csv' missover dlm="," firstobs=2;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ 
+ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity TotalPrice ProductPriceNextYear ProductPricePreviousYear;
+ARRAY prices(3) ProductPrice ProductPriceNextYear ProductPricePreviousYear;
+	DO i = 1 TO 3;
+		IF prices(i) < 400 THEN prices(i) = (prices(i)* 1.10);
+	END;
+RUN;
+PROC PRINT data=nonDiscountedProducts;
+	title 'prdoucts increased by 10%';
+Run;
+
+/* Using report procedures*/
+
+
+DATA produse_print;
+infile '/home/u48767212/ProjectSAS/Online_store_more_prices.csv' missover dlm="," firstobs=2;
+length ProductCategory $20;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ 
+ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity TotalPrice ProductPriceNextYear ProductPricePreviousYear;
+	TotalPricePreviousYear = Quantity * ProductPricePreviousYear;
+	TotalPriceNextYear = Quantity * ProductPriceNextYear;
+RUN;
+PROC SORT DATA=produse_print;
+	BY ProductCategory;
+PROC PRINT DATA=produse_print;
+var ProductName TotalPricePreviousYear TotalPriceNextYear;
+	BY ProductCategory;
+	SUM TotalPrice;
+	SUM TotalPricePreviousYear;
+	SUM TotalPriceNextYear;
+	TITLE 'The total prices for all the years summed up';
+RUN;
+
+/* report procedure to display data organized by ProductCategory*/
+PROC REPORT DATA = total_products_sale NOWINDOWS;
+COLUMNS ProductCategory ProductName ProductCode;
+DEFINE ProductCategory / GROUP 'Prod category';
+DEFINE ProductName / Display 'Prod name';
+DEFINE ProductCode / Display 'Prod code';
+RUN;
+
+
+/*UNIVARIATE*/
+
+
+DATA total_products_sale;
+infile '/home/u48767212/ProjectSAS/Online_store_more_prices.csv' missover dlm="," firstobs=2;
+length ProductCategory $20;
+input CrtNo ProductName$ Manufacturer$ ProductCode$ ProductCategory$ 
+ProductPrice DiscountPercentage DiscountEndDate :ddmmyy10. Quantity TotalPrice ProductPriceNextYear ProductPricePreviousYear;
+RUN;
+
+PROC UNIVARIATE DATA=total_products_sale;
+	VAR TotalPrice;
+	ID ProductCategory;
+	Title "Statistical indicators for the total price of products";
+RUN;
+/*Histogram*/
+
+PROC UNIVARIATE DATA=total_products_sale noprint; *no output tables;
+	VAR TotalPrice;
+	HISTOGRAM TotalPrice;
+	Title "Histogram of total sales";
+RUN;
+
+/* BAR CHART on Product Category for sales */ 
+
+GOPTIONS  reset=all;
+TITLE "Sum of total sales by category";
+PATTERN value=L1;
+AXIS1 order =("Large Appliances" "Mobile" "TV Video" "Gaming" "Components"); 
+PROC GCHART data=total_products_sale(keep= ProductCategory TotalPrice);
+VBAR ProductCategory / sumvar=TotalPrice
+			type=sum
+			maxis=axis1;
+RUN;
+QUIT;
+
+/* Pie chart */
+TITLE 'Pie chart for categories';
+GOPTIONS reset=all;
+PROC GCHART data = total_products_sale(keep= ProductCategory TotalPrice);
+	PIE3D  ProductCategory;
+RUN;
+QUIT;
+
+/* chart with a variable as a subgroup";*/
+
+TITLE 'Chart by prod category and manufacturer';
+PATTERN value = solid;
+PROC GCHART data = total_products_sale(keep= ProductCategory Manufacturer);
+VBAR Manufacturer / subgroup= ProductCategory;
+RUN;
+QUIT;
+
+/* scatter plot */
+
+proc sgplot data = total_products_sale;
+	scatter x = Quantity y = ProductPrice;
+	Title 'Scatter plot';
+run;
+
+/* vline */
+proc sgplot data=total_products_sale;
+ title "Total price by Manufacturer and Category";
+ vline Manufacturer / response=TotalPrice stat=mean markers
+ group=ProductCategory lineattrs=(thickness=4px);
+ styleattrs datasymbols=(TriangleFilled CircleFilled)
+ datalinepatterns=(ShortDash LongDash);
+run;
+
+
+/* Regression */
+proc reg data= total_products_sale;
+var DiscountPercentage ProductPrice ;
+model DiscountPercentage = ProductPrice;
+Plot DiscountPercentage * ProductPrice;
+TITLE 'Regression results';
+RUN;
+
+
+/* CORRELATION */ 
+PROC CORR data = total_products_sale;
+	VAR ProductPrice; 
+	WITH DiscountPercentage;
+	TITLE "Correlation between discounts and prices";
+RUN;
+
+/* ANOVA CLASS IS QUALITATIVE FACTOR MODEL 
+TotalPrice=ProductCategory tells SAS that TotalPrice is the response and ProductCategory is a factor*/ 
+PROC ANOVA DATA = total_products_sale;
+	CLASS ProductCategory;
+	MODEL TotalPrice = ProductCategory;
+	MEANS ProductCategory / SCHEFFE;
+	TITLE "Total price with category";
+RUN;
+
+
